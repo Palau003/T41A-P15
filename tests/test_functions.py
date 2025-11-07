@@ -1,42 +1,52 @@
 import psycopg2
-from datetime import date
+import pytest
 
-def test_functions():
-    conn = psycopg2.connect(
-        dbname='test_db',
-        user='postgres',
-        password='postgres',
-        host='localhost',
-        port='5432'
-    )
-    cur = conn.cursor()
+DB_CONFIG = {
+    "dbname": "test_db",
+    "user": "postgres",
+    "password": "postgres",
+    "host": "localhost",
+    "port": 5432
+}
 
-    # Calcular descuento
-    cur.execute("SELECT calcular_descuento(1000, 10);")
-    resultado = cur.fetchone()[0]
-    assert round(resultado, 2) == 900.00
-
-    # 2️⃣ Validar email
-    cur.execute("SELECT validar_email('usuario@test.com');")
-    assert cur.fetchone()[0] is True
-    cur.execute("SELECT validar_email('usuario.test.com');")
-    assert cur.fetchone()[0] is False
-
-    # Productos con bajo stock
-    cur.execute("SELECT * FROM productos_con_stock_bajo(5);")
-    productos = cur.fetchall()
-    assert all(p[2] < 5 for p in productos)
-    assert len(productos) >= 1
-
-    # Día de la semana
-    cur.execute("SELECT obtener_dia_semana('2025-11-03');")
-    dia = cur.fetchone()[0].strip()
-    assert dia in ['Monday', 'Lunes']  # depende del idioma del sistema
-
-    # Contar empleados en TI (id 1)
-    cur.execute("SELECT contar_empleados(1);")
-    count = cur.fetchone()[0]
-    assert count == 3
-
-    cur.close()
+@pytest.fixture(scope="module")
+def db_connection():
+    conn = psycopg2.connect(**DB_CONFIG)
+    yield conn
     conn.close()
+
+def fetch_scalar(conn, query, params=()):
+    with conn.cursor() as cur:
+        cur.execute(query, params)
+        return cur.fetchone()[0]
+
+def fetch_all(conn, query, params=()):
+    with conn.cursor() as cur:
+        cur.execute(query, params)
+        return cur.fetchall()
+
+def test_calcular_descuento(db_connection):
+    precio_1 = fetch_scalar(db_connection, "SELECT calcular_descuento(%s, %s)", (100.0, 25.0))
+    assert precio_1 == pytest.approx(75.0)
+
+def test_validar_correo(db_connection):
+    assert fetch_scalar(db_connection, "SELECT validar_correo('test@example.com')") == True
+    assert fetch_scalar(db_connection, "SELECT validar_correo('invalido')") == False
+
+def test_productos_stock_menor(db_connection):
+    query = "SELECT * FROM productos_stock_menor(%s)"
+    result = fetch_all(db_connection, query, (50,))
+    productos = {row[0] for row in result}
+    assert productos == {"Pantalla", "Alfombra", "HUB"}
+
+def test_get_dia_by_fecha(db_connection):
+    query = "SELECT get_dia_by_fecha(%s::date)"
+    dia = fetch_scalar(db_connection, query, ("2025-01-01",))
+    assert dia in ("Miércoles", "Wednesday")
+
+def test_get_cantidad_empleados_departamento(db_connection):
+    query = "SELECT get_cantidad_empleados_departamento(%s)"
+    cantidad_ing = fetch_scalar(db_connection, query, (2,))
+    assert cantidad_ing == 2
+    cantidad_ventas = fetch_scalar(db_connection, query, (1,))
+    assert cantidad_ventas == 2
