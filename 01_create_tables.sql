@@ -1,14 +1,22 @@
--- Crear tabla de productos y tabla de auditoría
-
-CREATE TABLE IF NOT EXISTS productos (
-    id SERIAL PRIMARY KEY,
-    nombre TEXT NOT NULL,
-    precio NUMERIC(10,2) NOT NULL
+CREATE TABLE productos(
+  id SERIAL PRIMARY KEY,
+  nombre TEXT NOT NULL,
+  precio FLOAT NOT NULL,
+  stock INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS auditoria (
-    id SERIAL PRIMARY KEY,
-    producto_id INT,
-    accion TEXT,
-    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE empleados(
+  id SERIAL PRIMARY KEY,
+  nombre TEXT NOT NULL
+);
+
+CREATE TABLE departamento(
+  id SERIAL PRIMARY KEY,
+  nombre TEXT NOT NULL
+);
+
+CREATE TABLE empleados_departamento(
+  id_departamento INTEGER REFERENCES departamento(id),
+  id_empleado INTEGER REFERENCES empleados(id),
+  PRIMARY KEY(id_departamento, id_empleado)
 );
